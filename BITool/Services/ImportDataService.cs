@@ -121,7 +121,7 @@ namespace BITool.Services
 
         public static void AddImportDataService(this WebApplication app)
         {
-            app.MapGet("data/getAdminScores", [Authorize] async (IConfiguration configuration) =>
+            app.MapGet("data/getAdminScores", [Authorize] async Task<IResult> (IConfiguration configuration) =>
             {
                 var sqlConnectionStr = configuration["ConnectionStrings:DefaultConnection"];
                 using (var connection = new MySqlConnection(sqlConnectionStr))

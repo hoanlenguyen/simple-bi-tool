@@ -10,9 +10,10 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 //add db context
+var sqlConnectionStr = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<ApplicationDbContext>(
                 options => options.UseMySql(
-                    connectionString: builder.Configuration.GetConnectionString("DefaultConnection"),
+                    connectionString: sqlConnectionStr,
                     serverVersion: new MySqlServerVersion(builder.Configuration["MySqlVersion"])));
 
 //add identity
@@ -81,6 +82,20 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
+//ExceptionHandler
+app.UseExceptionHandler(c => c.Run(async context =>
+{
+    var exception = context.Features
+        .Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()
+        ?.Error;
+    if (exception is not null)
+    {
+        var response = new { error = exception.Message };
+        context.Response.StatusCode = 400;
+        await context.Response.WriteAsJsonAsync(response);
+    }
+}));
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -99,6 +114,7 @@ app.UseAuthorization();
 //add Services
 app.AddAdminUserService();
 app.AddImportDataService();
+app.AddExportDataService(sqlConnectionStr);
 
 
 app.Run();

@@ -74,6 +74,13 @@ namespace BITool.Services
                 ) =>
             {
                 //var sqlConnectionStr = configuration["ConnectionStrings:DefaultConnection"];
+
+                if (dateFirstAddedFrom != null)
+                    dateFirstAddedFrom = dateFirstAddedFrom.Value.Date;
+
+                if (dateFirstAddedTo != null)
+                    dateFirstAddedTo = dateFirstAddedTo.Value.Date.AddDays(1).AddMilliseconds(-1);
+
                 using (var conn = new MySqlConnection(sqlConnectionStr))
                 {
                     conn.Open();
@@ -88,11 +95,11 @@ namespace BITool.Services
                     var customerData = new List<string>();
                     while (rdr.Read())
                     {
-                        customerData.Add(rdr["CustomerMobileNo"].ToString());
+                        customerData.Add((string)rdr["CustomerMobileNo"]);
                     }
                     rdr.Close();
                     conn.Close();
-                    return Results.Ok(customerData);
+                    return Results.Ok(customerData.Count);
                 }
             });
         }

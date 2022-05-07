@@ -1,26 +1,25 @@
-DROP PROCEDURE IF EXISTS `SearchCustomer`
-
+USE devdb; 
+DROP PROCEDURE IF EXISTS `SearchCustomer`;
+DELIMITER $$
 CREATE PROCEDURE `SearchCustomer`(
-IN scoreId int = null,
-IN scoreCategory varchar(200)= null,
-IN keyWord varchar(200)= null,
-IN dateFirstAddedFrom DATETIME = null,
-IN dateFirstAddedTo DATETIME = null,
+IN scoreId INT,
+IN scoreCategory varchar(200),
+IN keyWord varchar(200),
+IN dateFirstAddedFrom DATETIME,
+IN dateFirstAddedTo DATETIME
 )
 BEGIN
-        SET @query = CONCAT('SELECT count(cID) 
-        FROM tblclassifieds c
-        JOIN tblphotos p 
-        ON c.cmd5val=p.cClassCode 
-        WHERE p.cpMain=1 
-        AND c.cMarkedInappropriate=0 
-        AND c.cBlacklisted=0 
-        AND c.cEndDate>NOW() 
-        AND (cType=29) OR (c.cType=27 OR c.cType=28) 
-        AND c.cCompanyId IN (',_dealerIds,')
-        AND (("',_dealerPhoneNumber,'" is null) or (c.cPhoneNum="',_dealerPhoneNumber,'"));');
-    --  SELECT @query;
-     PREPARE stmt FROM @query;
-    EXECUTE stmt;
-    DEALLOCATE PREPARE stmt;
-END //
+    SELECT c.CustomerMobileNo 
+    FROM customer c     
+    INNER JOIN customerscore cs 
+    ON c.CustomerMobileNo = cs.CustomerMobileNo
+    LEFT JOIN adminscore ads 
+    ON ads.ScoreID = cs.ScoreID 
+    where ((scoreId is not null and cs.ScoreID = scoreId) OR scoreId is null)
+    and ((scoreCategory is not null and ads.ScoreCategory = scoreCategory) OR scoreCategory is null)
+    and ((keyWord is not null and c.CustomerMobileNo like CONCAT('%', keyWord, '%')) OR keyWord is null)
+    and ((dateFirstAddedFrom is not null and c.DateFirstAdded >= dateFirstAddedFrom) OR dateFirstAddedFrom is null)
+    and ((dateFirstAddedTo is not null and c.DateFirstAdded <= dateFirstAddedTo) OR dateFirstAddedTo is null)
+   ;
+END$$
+DELIMITER

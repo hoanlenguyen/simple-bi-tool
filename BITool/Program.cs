@@ -8,6 +8,7 @@ using Microsoft.OpenApi.Models;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
+//builder.WebHost.UseKestrel(o => o.Limits.MaxRequestBodySize = 1048576000).UseIIS();
 
 //add db context
 var sqlConnectionStr = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -46,7 +47,6 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
-builder.WebHost.UseKestrel(o => o.Limits.MaxRequestBodySize = null);
 
 // add Swagger & JWT authen to Swagger
 var securityScheme = new OpenApiSecurityScheme()

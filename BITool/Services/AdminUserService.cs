@@ -36,6 +36,9 @@ namespace BITool.Services
                 if (user is null)
                     user = await userManager.FindByEmailAsync(input.UserName);
 
+                if (user is null)
+                    return Results.Unauthorized();
+
                 if (await userManager.CheckPasswordAsync(user, input.Password))
                 {
                     var issuer = config["Jwt:Issuer"];

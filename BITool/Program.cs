@@ -1,6 +1,7 @@
 using BITool.DBContext;
 using BITool.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -21,6 +22,16 @@ builder.Services.AddDbContext<ApplicationDbContext>(
 builder.Services.AddIdentity<AdminUser, AdminUserRole>()
                 .AddEntityFrameworkStores<ApplicationDbContext>()
                 .AddDefaultTokenProviders();
+
+//add CORS 
+var allowSpecificOriginsPolicy = "AllowSpecificOriginsPolicy";
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(name: allowSpecificOriginsPolicy, builder => { builder.WithOrigins("http://localhost:8080", "https://localhost:8080")
+                                                                            .AllowAnyHeader()
+                                                                            .AllowAnyMethod();  
+    });
+});
 
 // Add JWT configuration
 builder.Services
@@ -46,7 +57,6 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
-
 
 // add Swagger & JWT authen to Swagger
 var securityScheme = new OpenApiSecurityScheme()
@@ -85,9 +95,7 @@ var app = builder.Build();
 //ExceptionHandler
 app.UseExceptionHandler(c => c.Run(async context =>
 {
-    var exception = context.Features
-        .Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()
-        ?.Error;
+    var exception = context.Features.Get<IExceptionHandlerFeature>()?.Error;
     if (exception is not null)
     {
         var response = new { error = exception.Message };
@@ -106,8 +114,9 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-// Authen & Authorize
+// CORS & Authen & Authorize
 app.UseHttpsRedirection();
+app.UseCors(allowSpecificOriginsPolicy);
 app.UseAuthentication();
 app.UseAuthorization();
 

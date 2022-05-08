@@ -25,11 +25,14 @@ builder.Services.AddIdentity<AdminUser, AdminUserRole>()
 
 //add CORS 
 var allowSpecificOriginsPolicy = "AllowSpecificOriginsPolicy";
+var corsOrigins = (builder.Configuration["CorsOrigins"]?? "http://localhost:8080").Split(',');
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy(name: allowSpecificOriginsPolicy, builder => { builder.WithOrigins("http://localhost:8080", "https://localhost:8080")
-                                                                            .AllowAnyHeader()
-                                                                            .AllowAnyMethod();  
+    options.AddPolicy(name: allowSpecificOriginsPolicy, builder => 
+    { 
+        builder.WithOrigins(corsOrigins)
+               .AllowAnyHeader()
+               .AllowAnyMethod();
     });
 });
 
@@ -99,7 +102,7 @@ app.UseExceptionHandler(c => c.Run(async context =>
     if (exception is not null)
     {
         var response = new { error = exception.Message };
-        context.Response.StatusCode = 400;
+        context.Response.StatusCode = (int)System.Net.HttpStatusCode.InternalServerError;
         await context.Response.WriteAsJsonAsync(response);
     }
 }));

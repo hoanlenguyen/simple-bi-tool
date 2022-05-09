@@ -1,6 +1,6 @@
 create table AdminScore(
    ScoreID INT NOT NULL AUTO_INCREMENT,
-   ScoreCatergory VARCHAR(500),
+   ScoreCategory VARCHAR(200),
    ScoreTitle VARCHAR(500),
    Points INT NOT NULL,
    Status INT NOT null,
@@ -13,6 +13,7 @@ create table AdminScore(
 -- create INDEX ScoreCatergory ON AdminScore (ScoreCatergory);
 -- DROP INDEX ScoreCatergory ON AdminScore;
 -- SHOW INDEX FROM AdminScore
+--ALTER TABLE AdminScore CHANGE ScoreCatergory ScoreCategory VARCHAR(200);
 
 create table AdminCampaign(
    CampaignID INT NOT NULL AUTO_INCREMENT,

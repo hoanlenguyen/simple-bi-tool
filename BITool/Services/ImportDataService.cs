@@ -101,7 +101,7 @@ namespace BITool.Services
                     Rows.Add(string.Format("('{0}', {1}, '{2}', {3})",
                         item.CustomerMobileNo,
                         item.ScoreID,
-                        MySqlHelper.EscapeString(item.DateOccurred.ToString("yyyy-MM-dd hh:MM:ss")),
+                        item.DateOccurred,
                         item.Status
                        ));
                 }
@@ -154,7 +154,7 @@ namespace BITool.Services
                     adminScores = conn.Query<AdminScoreDto>("SELECT * FROM adminscore")
                                                     .ToList();
                 }
-                var scoreTiltles = adminScores.Select(p => p.ScoreTitle);
+                var scoreTiltles = adminScores.Select(p => p.ScoreTitle.ToLower());
 
                 //Process excel file
                 using (var stream = new MemoryStream())
@@ -177,7 +177,7 @@ namespace BITool.Services
                             {
                                 DateOccurred = (worksheet.Cells[row, 1].Value ?? string.Empty).ToString().Trim(),
                                 CustomerMobileNo = (worksheet.Cells[row, 2].Value ?? string.Empty).ToString().Trim(),
-                                ScoreTitle = (worksheet.Cells[row, 3].Value ?? string.Empty).ToString().Trim(),
+                                ScoreTitle = (worksheet.Cells[row, 3].Value ?? string.Empty).ToString().Trim().ToLower(),
                             };
                             item.ParsedDateOccurred = CheckValidDate(item.DateOccurred);
                             if (item.ParsedDateOccurred is null)
@@ -206,8 +206,8 @@ namespace BITool.Services
                 customerScores = customerScoreList.Select(p => new CustomerScoreDto
                 {
                     CustomerMobileNo = p.CustomerMobileNo,
-                    ScoreID = adminScores.FirstOrDefault(q => q.ScoreTitle == p.ScoreTitle)?.ScoreID ?? 0,
-                    DateOccurred = p.ParsedDateOccurred.Value, //
+                    ScoreID = adminScores.FirstOrDefault(q => q.ScoreTitle.Equals(p.ScoreTitle,StringComparison.OrdinalIgnoreCase))?.ScoreID ?? 0,
+                    DateOccurred = p.DateOccurred, //
                     Status = 1
                 }).ToList();
                 //BulkInsertCustomerScoreToMySQL(sqlConnectionStr, customerScores);
@@ -218,6 +218,43 @@ namespace BITool.Services
 
                 return Results.Ok(errorList);
             })/*.Accepts<IFormFile>("multipart/form-data")*/;
+
+            
+            app.MapPost("data/importCustomerScoreList", [AllowAnonymous] async Task<IResult> (IConfiguration configuration, ImportCustomerScore input) =>
+            {
+                if(input == null ||input.CustomerList.Count==0)
+                    return Results.BadRequest("No file data found!");
+
+                var sqlConnectionStr = configuration["ConnectionStrings:DefaultConnection"];
+                var adminScores = new List<AdminScoreDto>();
+                using (var conn = new MySqlConnection(sqlConnectionStr))
+                {
+                    adminScores = conn.Query<AdminScoreDto>("SELECT * FROM adminscore")
+                                                    .ToList();
+                }
+                var scoreTiltles = adminScores.Select(p => p.ScoreTitle.ToLower());
+                
+                //Insert Customer
+                var customerMobileList = input.CustomerList.Select(p => p.CustomerMobileNo).Distinct();
+                //BulkInsertCustomerModelToMySQL(sqlConnectionStr, customerMobileList);
+
+                //Insert CustomerScore
+                var customerScores = new List<CustomerScoreDto>();
+                customerScores = input.CustomerList.Select(p => new CustomerScoreDto
+                {
+                    CustomerMobileNo = p.CustomerMobileNo,
+                    ScoreID = adminScores.FirstOrDefault(q => q.ScoreTitle.Equals(p.ScoreTitle,StringComparison.OrdinalIgnoreCase))?.ScoreID ?? 0,
+                    DateOccurred = p.DateOccurred, //
+                    Status = 1
+                }).ToList();
+                //BulkInsertCustomerScoreToMySQL(sqlConnectionStr, customerScores);
+                Parallel.Invoke(
+                    () => { BulkInsertCustomerModelToMySQL(sqlConnectionStr, customerMobileList); },
+                    () => { BulkInsertCustomerScoreToMySQL(sqlConnectionStr, customerScores); }
+                );
+
+                return Results.Ok();
+            });
         }
     }
 }

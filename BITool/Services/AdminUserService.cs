@@ -49,8 +49,13 @@ namespace BITool.Services
                         audience: audience,
                         signingCredentials: credentials);
                     var tokenHandler = new JwtSecurityTokenHandler();
-                    var stringToken = tokenHandler.WriteToken(token);
-                    return Results.Ok(stringToken);
+                    var accessToken = tokenHandler.WriteToken(token);
+                    return Results.Ok(new
+                    {
+                        accessToken= accessToken,
+                        email = user.Email,
+                        name = user.FirstName
+                    });
                 }
                 else
                 {

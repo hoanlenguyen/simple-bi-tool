@@ -3,7 +3,7 @@
     public class AdminScoreDto
     {
         public int ScoreID { get; set; }
-        public string ScoreCatergory { get; set; }
+        public string ScoreCategory { get; set; }
         public string ScoreTitle { get; set; }
         public int Points { get; set; }
         public int Status { get; set; }

@@ -99,7 +99,7 @@ namespace BITool.Services
                     }
                     rdr.Close();
                     conn.Close();
-                    return Results.Ok(customerData.Count);
+                    return Results.Ok(customerData);
                 }
             });
         }

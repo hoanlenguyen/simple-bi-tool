@@ -1,5 +1,4 @@
-﻿using BITool.Models;
-using Dapper;
+﻿using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using MySql.Data.MySqlClient;
 using System.Data;
@@ -13,7 +12,6 @@ namespace BITool.Services
             app.MapGet("data/getCustomers", [Authorize]
             async Task<IResult>
                 (
-                //IConfiguration configuration,
                 int? scoreId,
                 string? scoreCategory,
                 string? keyWord,
@@ -21,7 +19,6 @@ namespace BITool.Services
                 DateTime? dateFirstAddedTo
                 ) =>
             {
-                //var sqlConnectionStr = configuration["ConnectionStrings:DefaultConnection"];
                 using (var conn = new MySqlConnection(sqlConnectionStr))
                 {
                     var query = "SELECT c.CustomerMobileNo " +
@@ -56,7 +53,7 @@ namespace BITool.Services
 
                     //query += " LIMIT 1000";
 
-                    var customerData = conn.Query</*CustomerDto*/ string>(query)
+                    var customerData = conn.Query<string>(query)
                                                     .ToList();
                     return Results.Ok(customerData);
                 }
@@ -65,7 +62,6 @@ namespace BITool.Services
             app.MapGet("data/getCustomersBySP", [Authorize]
             async Task<IResult>
                 (
-                //IConfiguration configuration,
                 int? scoreId,
                 string? scoreCategory,
                 string? keyWord,
@@ -73,8 +69,6 @@ namespace BITool.Services
                 DateTime? dateFirstAddedTo
                 ) =>
             {
-                //var sqlConnectionStr = configuration["ConnectionStrings:DefaultConnection"];
-
                 if (dateFirstAddedFrom != null)
                     dateFirstAddedFrom = dateFirstAddedFrom.Value.Date;
 

@@ -1,6 +1,7 @@
 ﻿using BITool.Models;
 using Dapper;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Caching.Memory;
 using MySql.Data.MySqlClient;
 using OfficeOpenXml;
 using System.Data;
@@ -12,7 +13,8 @@ namespace BITool.Services
     public static class ImportDataService
     {
         #region Private
-
+        private const string GetAdminScoresKey = "getAdminScores";
+        private const string GetAdminCampaignsKey = "getAdminCampaigns";
         private static DateTime? CheckValidDate(string input)
         {
             DateTime result;
@@ -117,25 +119,45 @@ namespace BITool.Services
             }
         }
 
+        private static List<AdminScoreDto> GetAdminScores(string sqlConnectionStr)
+        {
+            using var connection = new MySqlConnection(sqlConnectionStr);
+            return connection.Query<AdminScoreDto>("SELECT * FROM adminscore").ToList();
+        }
+        private static List<AdminCampaignDto> GetAdminCampaigns(string sqlConnectionStr)
+        {
+            using var connection = new MySqlConnection(sqlConnectionStr);
+            return connection.Query<AdminCampaignDto>("SELECT * FROM admincampaign").ToList();
+        }
         #endregion Private
 
-        public static void AddImportDataService(this WebApplication app)
+        public static void AddImportDataService(this WebApplication app, string sqlConnectionStr)
         {
-            app.MapGet("data/getAdminScores", [Authorize] async Task<IResult> (IConfiguration configuration) =>
+            app.MapGet("data/getAdminCampaigns", [Authorize] async Task<IResult> (IMemoryCache memoryCache) =>
             {
-                var sqlConnectionStr = configuration["ConnectionStrings:DefaultConnection"];
-                using (var connection = new MySqlConnection(sqlConnectionStr))
-                {
-                    using (var conn = new MySqlConnection(sqlConnectionStr))
-                    {
-                        var adminScores = conn.Query<AdminScoreDto>("SELECT * FROM adminscore")
-                                                         .ToList();
-                        return Results.Ok(adminScores);
-                    }
-                }
+                List<AdminCampaignDto> items = null;
+                if (memoryCache.TryGetValue(GetAdminCampaignsKey, out items))
+                    return Results.Ok(items);
+
+                items = GetAdminCampaigns(sqlConnectionStr);
+                var cacheOptions = new MemoryCacheEntryOptions().SetSlidingExpiration(TimeSpan.FromHours(24));
+                memoryCache.Set(GetAdminCampaignsKey, items, cacheOptions);
+                return Results.Ok(items);
             });
 
-            app.MapPost("data/importCustomerScore", [AllowAnonymous] async Task<IResult> (IConfiguration configuration, HttpRequest request) =>
+            app.MapGet("data/getAdminScores", [Authorize] async Task<IResult> (IMemoryCache memoryCache) =>
+            {
+                List<AdminScoreDto> items = null;
+                if (memoryCache.TryGetValue(GetAdminScoresKey, out items))
+                    return Results.Ok(items);
+
+                items = GetAdminScores(sqlConnectionStr);
+                var cacheOptions = new MemoryCacheEntryOptions().SetSlidingExpiration(TimeSpan.FromHours(24));
+                memoryCache.Set(GetAdminScoresKey, items, cacheOptions);
+                return Results.Ok(items);
+            });
+
+            app.MapPost("data/importCustomerScore", [AllowAnonymous] async Task<IResult> (/*IConfiguration configuration, */HttpRequest request) =>
             {
                 if (!request.Form.Files.Any())
                     return Results.BadRequest("No file found!");
@@ -145,7 +167,7 @@ namespace BITool.Services
                 if (formFile is null || formFile.Length == 0)
                     return Results.BadRequest("No file found!");
 
-                var sqlConnectionStr = configuration["ConnectionStrings:DefaultConnection"];
+                //var sqlConnectionStr = configuration["ConnectionStrings:DefaultConnection"];
                 var adminScores = new List<AdminScoreDto>();
                 var customerScoreList = new List<CustomerImportDto>();
                 var errorList = new List<string>();
@@ -199,7 +221,6 @@ namespace BITool.Services
 
                 //Insert Customer
                 var customerMobileList = customerScoreList.Select(p => p.CustomerMobileNo).Distinct();
-                //BulkInsertCustomerModelToMySQL(sqlConnectionStr, customerMobileList);
 
                 //Insert CustomerScore
                 var customerScores = new List<CustomerScoreDto>();
@@ -210,33 +231,33 @@ namespace BITool.Services
                     DateOccurred = p.DateOccurred, //
                     Status = 1
                 }).ToList();
-                //BulkInsertCustomerScoreToMySQL(sqlConnectionStr, customerScores);
+
                 Parallel.Invoke(
                     () =>{ BulkInsertCustomerModelToMySQL(sqlConnectionStr, customerMobileList); },
                     () =>{ BulkInsertCustomerScoreToMySQL(sqlConnectionStr, customerScores); }
                 );
 
                 return Results.Ok(errorList);
-            })/*.Accepts<IFormFile>("multipart/form-data")*/;
+            });
 
             
-            app.MapPost("data/importCustomerScoreList", [AllowAnonymous] async Task<IResult> (IConfiguration configuration, ImportCustomerScore input) =>
+            app.MapPost("data/importCustomerScoreList", [AllowAnonymous] async Task<IResult> (IMemoryCache memoryCache, ImportCustomerScore input) =>
             {
                 if(input == null ||input.CustomerList.Count==0)
                     return Results.BadRequest("No file data found!");
 
-                var sqlConnectionStr = configuration["ConnectionStrings:DefaultConnection"];
-                var adminScores = new List<AdminScoreDto>();
-                using (var conn = new MySqlConnection(sqlConnectionStr))
+                List<AdminScoreDto> adminScores = null;
+                if (!memoryCache.TryGetValue(GetAdminScoresKey, out adminScores))
                 {
-                    adminScores = conn.Query<AdminScoreDto>("SELECT * FROM adminscore")
-                                                    .ToList();
-                }
+                    adminScores = GetAdminScores(sqlConnectionStr);
+                    var cacheOptions = new MemoryCacheEntryOptions().SetSlidingExpiration(TimeSpan.FromHours(24));
+                    memoryCache.Set(GetAdminScoresKey, adminScores, cacheOptions);
+                }  
+                
                 var scoreTiltles = adminScores.Select(p => p.ScoreTitle.ToLower());
                 
                 //Insert Customer
                 var customerMobileList = input.CustomerList.Select(p => p.CustomerMobileNo).Distinct();
-                //BulkInsertCustomerModelToMySQL(sqlConnectionStr, customerMobileList);
 
                 //Insert CustomerScore
                 var customerScores = new List<CustomerScoreDto>();
@@ -247,7 +268,7 @@ namespace BITool.Services
                     DateOccurred = p.DateOccurred, //
                     Status = 1
                 }).ToList();
-                //BulkInsertCustomerScoreToMySQL(sqlConnectionStr, customerScores);
+
                 Parallel.Invoke(
                     () => { BulkInsertCustomerModelToMySQL(sqlConnectionStr, customerMobileList); },
                     () => { BulkInsertCustomerScoreToMySQL(sqlConnectionStr, customerScores); }

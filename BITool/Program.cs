@@ -92,6 +92,7 @@ builder.Services.AddSwaggerGen(options =>
     options.AddSecurityDefinition("Bearer", securityScheme);
     options.AddSecurityRequirement(securityReq);
 });
+builder.Services.AddMemoryCache();
 
 var app = builder.Build();
 
@@ -125,7 +126,7 @@ app.UseAuthorization();
 
 //add Services
 app.AddAdminUserService();
-app.AddImportDataService();
+app.AddImportDataService(sqlConnectionStr);
 app.AddExportDataService(sqlConnectionStr);
 
 

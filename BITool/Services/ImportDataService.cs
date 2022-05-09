@@ -157,7 +157,7 @@ namespace BITool.Services
                 return Results.Ok(items);
             });
 
-            app.MapPost("data/importCustomerScore", [AllowAnonymous] async Task<IResult> (/*IConfiguration configuration, */HttpRequest request) =>
+            app.MapPost("data/importCustomerScore", [AllowAnonymous] async Task<IResult> (HttpRequest request) =>
             {
                 if (!request.Form.Files.Any())
                     return Results.BadRequest("No file found!");
@@ -167,7 +167,6 @@ namespace BITool.Services
                 if (formFile is null || formFile.Length == 0)
                     return Results.BadRequest("No file found!");
 
-                //var sqlConnectionStr = configuration["ConnectionStrings:DefaultConnection"];
                 var adminScores = new List<AdminScoreDto>();
                 var customerScoreList = new List<CustomerImportDto>();
                 var errorList = new List<string>();

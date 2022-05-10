@@ -238,7 +238,6 @@ namespace BITool.Services
 
                 return Results.Ok(errorList);
             });
-
             
             app.MapPost("data/importCustomerScoreList", [AllowAnonymous] async Task<IResult> (IMemoryCache memoryCache, ImportCustomerScore input) =>
             {

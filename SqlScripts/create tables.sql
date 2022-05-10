@@ -52,7 +52,7 @@ create table CustomerScore(
 
 create table RecordCustomerExport(
    ID INT NOT NULL AUTO_INCREMENT,
-   CustomerID INT NOT NULL,
+   CustomerMobileNo VARCHAR(10) NOT NULL,
    CampaignNameID INT NOT NULL,
    DateExported DATETIME NOT NULL,
    Status INT NOT null,

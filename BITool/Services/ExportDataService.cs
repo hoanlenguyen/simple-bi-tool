@@ -1,12 +1,43 @@
-﻿using Dapper;
+﻿using BITool.Models;
+using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using MySql.Data.MySqlClient;
 using System.Data;
+using System.Text;
 
 namespace BITool.Services
 {
     public static class ExportDataService
     {
+        #region private
+        private static void BulkInsertCustomerCampaignToMySQL(string sqlConnectionStr, IEnumerable<string> customerMobileList, int campaignID)
+        {
+            var nowStr = DateTime.Now.ToString("yyyy-MM-dd hh:MM:ss");            
+            var sCommand = new StringBuilder("INSERT IGNORE INTO recordcustomerexport (CustomerMobileNo, CampaignNameID, DateExported, Status) VALUES ");
+            using (MySqlConnection connection = new MySqlConnection(sqlConnectionStr))
+            {
+                List<string> Rows = new List<string>();
+                foreach (var phone in customerMobileList)
+                {
+                    Rows.Add(string.Format("('{0}',{1}, '{2}', {3})",
+                        MySqlHelper.EscapeString(phone),
+                        campaignID,
+                        MySqlHelper.EscapeString(nowStr),
+                        1
+                        ));
+                }
+
+                sCommand.Append(string.Join(",", Rows));
+                sCommand.Append(";");
+                connection.Open();
+                using (MySqlCommand myCmd = new MySqlCommand(sCommand.ToString(), connection))
+                {
+                    myCmd.CommandType = CommandType.Text;
+                    myCmd.ExecuteNonQuery();
+                }
+            }
+        }
+        #endregion private
         public static void AddExportDataService(this WebApplication app, string sqlConnectionStr)
         {
             app.MapGet("data/getCustomers", [Authorize]
@@ -95,6 +126,20 @@ namespace BITool.Services
                     conn.Close();
                     return Results.Ok(customerData);
                 }
+            });
+
+            app.MapPost("data/assignCampaignToCustomers", [Authorize]
+            async Task<IResult>(AssignCampaignToCustomerModel input) =>
+            {
+                if(input == null)
+                    return Results.BadRequest("No input data");
+
+                if (input.CampaignID == 0)
+                    return Results.BadRequest("No selected CampaignID");
+
+                BulkInsertCustomerCampaignToMySQL(sqlConnectionStr, input.CustomerList, input.CampaignID);
+
+                return Results.Ok(input);
             });
         }
     }

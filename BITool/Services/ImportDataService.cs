@@ -1,6 +1,7 @@
 ﻿using BITool.Models;
 using Dapper;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 using MySql.Data.MySqlClient;
 using OfficeOpenXml;
@@ -18,8 +19,7 @@ namespace BITool.Services
         private static DateTime? CheckValidDate(string input)
         {
             DateTime result;
-            var checkParse = true;
-            checkParse = DateTime.TryParseExact(input, "dd/MM/yyyy", CultureInfo.CurrentCulture, DateTimeStyles.None, out result);
+            var checkParse = DateTime.TryParseExact(input, "dd/MM/yyyy", CultureInfo.CurrentCulture, DateTimeStyles.None, out result);
 
             if (!checkParse)
                 checkParse = DateTime.TryParseExact(input, "dd/MM/yyyy hh:mm:ss", CultureInfo.CurrentCulture, DateTimeStyles.None, out result);
@@ -30,14 +30,14 @@ namespace BITool.Services
             if (!checkParse)
                 checkParse = DateTime.TryParseExact(input, "dd-MM-yyyy hh:mm:ss", CultureInfo.CurrentCulture, DateTimeStyles.None, out result);
 
-            if (!checkParse)
-                checkParse = DateTime.TryParseExact(input, "dd-MMM-yyyy", CultureInfo.CurrentCulture, DateTimeStyles.None, out result);
+            //if (!checkParse)
+            //    checkParse = DateTime.TryParseExact(input, "dd-MMM-yyyy", CultureInfo.CurrentCulture, DateTimeStyles.None, out result);
 
-            if (!checkParse)
-                checkParse = DateTime.TryParseExact(input, "dd-MMM-yyyy hh:mm:ss", CultureInfo.CurrentCulture, DateTimeStyles.None, out result);
+            //if (!checkParse)
+            //    checkParse = DateTime.TryParseExact(input, "dd-MMM-yyyy hh:mm:ss", CultureInfo.CurrentCulture, DateTimeStyles.None, out result);
 
-            if (!checkParse)
-                checkParse = DateTime.TryParse(input, out result);
+            //if (!checkParse)
+            //    checkParse = DateTime.TryParse(input, out result);
 
             if (!checkParse)
                 return null;
@@ -63,24 +63,13 @@ namespace BITool.Services
             return true;
         }
 
-        private static void BulkInsertCustomerModelToMySQL(string sqlConnectionStr, IEnumerable<string> customerMobileList)
+        private static void BulkInsertCustomerModelToMySQL(string sqlConnectionStr, IEnumerable<string> customerRows)
         {
-            var nowStr = DateTime.Now.ToString("yyyy-MM-dd hh:MM:ss");
             //add INSERT IGNORE to avoid throw error when duplicate CustomerMobileNo
-            var sCommand = new StringBuilder("INSERT IGNORE INTO Customer (DateFirstAdded, CustomerMobileNo, Status) VALUES ");
+            var sCommand = new StringBuilder("INSERT IGNORE INTO customer (DateFirstAdded, CustomerMobileNo, Status) VALUES ");
             using (MySqlConnection mConnection = new MySqlConnection(sqlConnectionStr))
             {
-                List<string> Rows = new List<string>();
-                foreach (var phone in customerMobileList)
-                {
-                    Rows.Add(string.Format("('{0}','{1}', {2})",
-                        MySqlHelper.EscapeString(nowStr),
-                        MySqlHelper.EscapeString(phone),
-                        1
-                        ));
-                }
-
-                sCommand.Append(string.Join(",", Rows));
+                sCommand.Append(string.Join(",", customerRows)); //may use MySqlHelper.EscapeString
                 sCommand.Append(";");
                 mConnection.Open();
                 using (MySqlCommand myCmd = new MySqlCommand(sCommand.ToString(), mConnection))
@@ -91,24 +80,13 @@ namespace BITool.Services
             }
         }
 
-        private static void BulkInsertCustomerScoreToMySQL(string sqlConnectionStr, IEnumerable<CustomerScoreDto> items)
+        private static void BulkInsertCustomerScoreToMySQL(string sqlConnectionStr, IEnumerable<string> items)
         {
             var sCommand = new StringBuilder(
-                "INSERT IGNORE INTO CustomerScore (CustomerMobileNo, ScoreID, DateOccurred, Status) VALUES ");
+                "INSERT IGNORE INTO customerscore (CustomerMobileNo, ScoreID, DateOccurred, Status) VALUES ");
             using (MySqlConnection mConnection = new MySqlConnection(sqlConnectionStr))
             {
-                List<string> Rows = new List<string>();
-                foreach (var item in items)
-                {
-                    Rows.Add(string.Format("('{0}', {1}, '{2}', {3})",
-                        item.CustomerMobileNo,
-                        item.ScoreID,
-                        item.DateOccurred,
-                        item.Status
-                       ));
-                }
-
-                sCommand.Append(string.Join(",", Rows));
+                sCommand.Append(string.Join(",", items));
                 sCommand.Append(";");
                 mConnection.Open();
                 using (MySqlCommand myCmd = new MySqlCommand(sCommand.ToString(), mConnection))
@@ -133,7 +111,7 @@ namespace BITool.Services
 
         public static void AddImportDataService(this WebApplication app, string sqlConnectionStr)
         {
-            app.MapGet("data/getAdminCampaigns", [Authorize] async Task<IResult> (IMemoryCache memoryCache) =>
+            app.MapGet("data/getAdminCampaigns", [AllowAnonymous] async Task<IResult> (IMemoryCache memoryCache) =>
             {
                 List<AdminCampaignDto> items = null;
                 if (memoryCache.TryGetValue(GetAdminCampaignsKey, out items))
@@ -157,7 +135,8 @@ namespace BITool.Services
                 return Results.Ok(items);
             });
 
-            app.MapPost("data/importCustomerScore", [AllowAnonymous] async Task<IResult> (HttpRequest request) =>
+            app.MapPost("data/importCustomerScore", [AllowAnonymous] [DisableRequestSizeLimit]
+            async Task<IResult> (IMemoryCache memoryCache, HttpRequest request) =>
             {
                 if (!request.Form.Files.Any())
                     return Results.BadRequest("No file found!");
@@ -167,13 +146,15 @@ namespace BITool.Services
                 if (formFile is null || formFile.Length == 0)
                     return Results.BadRequest("No file found!");
 
-                var adminScores = new List<AdminScoreDto>();
-                var customerScoreList = new List<CustomerImportDto>();
-                var errorList = new List<string>();
-                using (var conn = new MySqlConnection(sqlConnectionStr))
+                var errorList = new List<CustomerImportErrorDto>();
+                var customerRows = new List<string>();
+                var customerScoreRows = new List<string>();
+                List<AdminScoreDto> adminScores = null;
+                if (!memoryCache.TryGetValue(GetAdminScoresKey, out adminScores))
                 {
-                    adminScores = conn.Query<AdminScoreDto>("SELECT * FROM adminscore")
-                                                    .ToList();
+                    adminScores = GetAdminScores(sqlConnectionStr);
+                    var cacheOptions = new MemoryCacheEntryOptions().SetSlidingExpiration(TimeSpan.FromHours(24));
+                    memoryCache.Set(GetAdminScoresKey, adminScores, cacheOptions);
                 }
                 var scoreTiltles = adminScores.Select(p => p.ScoreTitle.ToLower());
 
@@ -186,94 +167,205 @@ namespace BITool.Services
                     {
                         ExcelWorksheet worksheet = package.Workbook.Worksheets.FirstOrDefault();
                         if (worksheet == null)
-                            return Results.BadRequest();
+                            return Results.BadRequest("No worksheet found!");
 
                         //read excel file data and add data
                         var isValidPhoneNumber = true;
                         var isValidScoreTiltles = true;
                         var rowCount = worksheet.Dimension.Rows;
+                        string dateOccurred;
+                        string customerMobileNo;
+                        string scoreTitle;
+                        string parsedDateOccurredStr;
+                        DateTime? parsedDateOccurred;
+                        var cells = new List<string>();
+                        var errorDetails = new List<string>();
+                        
                         for (int row = 2; row <= rowCount; row++)
                         {
-                            var item = new CustomerImportDto
+                            dateOccurred = (worksheet.Cells[row, 1]?.Value ?? string.Empty).ToString().Trim();
+                            customerMobileNo = (worksheet.Cells[row, 2]?.Value ?? string.Empty).ToString().Trim();
+                            scoreTitle = (worksheet.Cells[row, 3]?.Value ?? string.Empty).ToString().Trim();
+                            parsedDateOccurred = CheckValidDate(dateOccurred);
+                            isValidPhoneNumber = CheckValidPhoneNumber(customerMobileNo);
+                            isValidScoreTiltles = scoreTiltles.Contains(scoreTitle.ToLower());
+
+                            if (parsedDateOccurred is null)
                             {
-                                DateOccurred = (worksheet.Cells[row, 1].Value ?? string.Empty).ToString().Trim(),
-                                CustomerMobileNo = (worksheet.Cells[row, 2].Value ?? string.Empty).ToString().Trim(),
-                                ScoreTitle = (worksheet.Cells[row, 3].Value ?? string.Empty).ToString().Trim().ToLower(),
-                            };
-                            item.ParsedDateOccurred = CheckValidDate(item.DateOccurred);
-                            if (item.ParsedDateOccurred is null)
-                                errorList.Add($"Cell A{row} - date invalid");
+                                cells.Add($"Cell A{row}");
+                                errorDetails.Add("invalid date");
+                            } 
 
-                            isValidPhoneNumber = CheckValidPhoneNumber(item.CustomerMobileNo);
                             if (!isValidPhoneNumber)
-                                errorList.Add($"Cell B{row} - mobile invalid");
+                            {
+                                cells.Add($"Cell B{row}");
+                                errorDetails.Add("invalid mobile No");
+                            }
 
-                            isValidScoreTiltles = scoreTiltles.Contains(item.ScoreTitle);
                             if (!isValidScoreTiltles)
-                                errorList.Add($"Cell C{row} - score title invalid");
+                            {
+                                cells.Add($"Cell C{row}");
+                                errorDetails.Add("invalid score title");
+                            }                                
 
-                            if (item.ParsedDateOccurred != null && isValidPhoneNumber && isValidScoreTiltles)
-                                customerScoreList.Add(item);
+                            if (parsedDateOccurred != null && isValidPhoneNumber && isValidScoreTiltles)
+                            {
+                                parsedDateOccurredStr = parsedDateOccurred.Value.ToString("yyyy-MM-dd");                                 
+                                customerRows.Add(string.Format("('{0}','{1}', {2})", parsedDateOccurredStr, customerMobileNo, 1));
+                                customerScoreRows.Add(string.Format("('{0}', {1}, '{2}', {3})",
+                                    customerMobileNo,
+                                    adminScores.FirstOrDefault(q => q.ScoreTitle.Equals(scoreTitle, StringComparison.OrdinalIgnoreCase))?.ScoreID ?? 0,
+                                    parsedDateOccurredStr,
+                                    1
+                                   ));
+
+                            }
+                            else
+                            {
+                                errorList.Add(new CustomerImportErrorDto
+                                {
+                                    Cell = string.Join(" - ", cells),
+                                    ErrorDetail = string.Join(" - ", errorDetails),
+                                    DateOccurred= dateOccurred,
+                                    CustomerMobileNo = customerMobileNo,
+                                    ScoreTitle = scoreTitle                                    
+                                });
+                                cells= new List<string>(); //reset after add
+                                errorDetails = new List<string>();
+                            }
+                                
                         }
                     }
                 }
 
-                //Insert Customer
-                var customerMobileList = customerScoreList.Select(p => p.CustomerMobileNo).Distinct();
+                //Parallel.Invoke(
+                //    () => { BulkInsertCustomerModelToMySQL(sqlConnectionStr, customerRows); },
+                //    () => { BulkInsertCustomerScoreToMySQL(sqlConnectionStr, customerScoreRows); }
+                //);
 
-                //Insert CustomerScore
-                var customerScores = new List<CustomerScoreDto>();
-                customerScores = customerScoreList.Select(p => new CustomerScoreDto
+                using (MySqlConnection mConnection = new MySqlConnection(sqlConnectionStr))
                 {
-                    CustomerMobileNo = p.CustomerMobileNo,
-                    ScoreID = adminScores.FirstOrDefault(q => q.ScoreTitle.Equals(p.ScoreTitle,StringComparison.OrdinalIgnoreCase))?.ScoreID ?? 0,
-                    DateOccurred = p.DateOccurred, //
-                    Status = 1
-                }).ToList();
+                    var sCommand = new StringBuilder("INSERT IGNORE INTO customer (DateFirstAdded, CustomerMobileNo, Status) VALUES ");
+                    sCommand.Append(string.Join(",", customerRows)); //may use MySqlHelper.EscapeString
+                    sCommand.Append(";");
+                    mConnection.Open();
+                    using (MySqlCommand myCmd = new MySqlCommand(sCommand.ToString(), mConnection))
+                    {
+                        myCmd.CommandType = CommandType.Text;
+                        myCmd.ExecuteNonQuery();
+                    }
 
-                Parallel.Invoke(
-                    () =>{ BulkInsertCustomerModelToMySQL(sqlConnectionStr, customerMobileList); },
-                    () =>{ BulkInsertCustomerScoreToMySQL(sqlConnectionStr, customerScores); }
-                );
+                    var customerCount = customerRows.Count;
+                    var customerScoreCount = customerScoreRows.Count;
+                    var limited = 600000;
+                    if (customerCount <= limited)//out of memory
+                    {
+                        sCommand.Append(string.Join(",", customerRows)); //may use MySqlHelper.EscapeString
+                        sCommand.Append(";");
+                        mConnection.Open();
+                        using (MySqlCommand myCmd = new MySqlCommand(sCommand.ToString(), mConnection))
+                        {
+                            myCmd.CommandType = CommandType.Text;
+                            myCmd.ExecuteNonQuery();
+                        }
+                    }
+                    else
+                    {
+                        var addRows = customerRows.GetRange(0, limited);
+                        sCommand.Append(string.Join(",", addRows)); //may use MySqlHelper.EscapeString
+                        sCommand.Append(";");
+                        mConnection.Open();
+                        using (MySqlCommand myCmd = new MySqlCommand(sCommand.ToString(), mConnection))
+                        {
+                            myCmd.CommandType = CommandType.Text;
+                            myCmd.ExecuteNonQuery();
+                        }
+
+                        addRows = customerRows.GetRange(limited, customerCount - limited);
+                        sCommand = new StringBuilder("INSERT IGNORE INTO customer (DateFirstAdded, CustomerMobileNo, Status) VALUES ");
+                        sCommand.Append(string.Join(",", customerRows)); //may use MySqlHelper.EscapeString
+                        sCommand.Append(";");
+                        using (MySqlCommand myCmd = new MySqlCommand(sCommand.ToString(), mConnection))
+                        {
+                            myCmd.CommandType = CommandType.Text;
+                            myCmd.ExecuteNonQuery();
+                        }
+                    }
+
+                    sCommand = new StringBuilder(
+                       "INSERT IGNORE INTO customerscore (CustomerMobileNo, ScoreID, DateOccurred, Status) VALUES ");
+                    if (customerScoreCount <= limited)//out of memory
+                    {
+                        sCommand.Append(string.Join(",", customerScoreRows));
+                        sCommand.Append(";");
+                        using (MySqlCommand myCmd = new MySqlCommand(sCommand.ToString(), mConnection))
+                        {
+                            myCmd.CommandType = CommandType.Text;
+                            myCmd.ExecuteNonQuery();
+                        }
+                    }
+                    else
+                    {
+                        var addRows = customerScoreRows.GetRange(0, limited);
+                        sCommand.Append(string.Join(",", addRows)); //may use MySqlHelper.EscapeString
+                        sCommand.Append(";");
+                        using (MySqlCommand myCmd = new MySqlCommand(sCommand.ToString(), mConnection))
+                        {
+                            myCmd.CommandType = CommandType.Text;
+                            myCmd.ExecuteNonQuery();
+                        }
+
+                        addRows = customerScoreRows.GetRange(limited, customerScoreCount - limited);
+                        sCommand = new StringBuilder(
+                        "INSERT IGNORE INTO customerscore (CustomerMobileNo, ScoreID, DateOccurred, Status) VALUES ");
+                        sCommand.Append(string.Join(",", addRows)); //may use MySqlHelper.EscapeString
+                        sCommand.Append(";");
+                        using (MySqlCommand myCmd = new MySqlCommand(sCommand.ToString(), mConnection))
+                        {
+                            myCmd.CommandType = CommandType.Text;
+                            myCmd.ExecuteNonQuery();
+                        }
+                    }
+                }
 
                 return Results.Ok(errorList);
             });
             
-            app.MapPost("data/importCustomerScoreList", [AllowAnonymous] async Task<IResult> (IMemoryCache memoryCache, ImportCustomerScore input) =>
-            {
-                if(input == null ||input.CustomerList.Count==0)
-                    return Results.BadRequest("No file data found!");
+            //app.MapPost("data/importCustomerScoreList", [AllowAnonymous] async Task<IResult> (IMemoryCache memoryCache, [FromBody] ImportCustomerScore input) =>
+            //{
+            //    if(input == null ||input.CustomerList.Count==0)
+            //        return Results.BadRequest("No file data found!");
 
-                List<AdminScoreDto> adminScores = null;
-                if (!memoryCache.TryGetValue(GetAdminScoresKey, out adminScores))
-                {
-                    adminScores = GetAdminScores(sqlConnectionStr);
-                    var cacheOptions = new MemoryCacheEntryOptions().SetSlidingExpiration(TimeSpan.FromHours(24));
-                    memoryCache.Set(GetAdminScoresKey, adminScores, cacheOptions);
-                }  
+            //    List<AdminScoreDto> adminScores = null;
+            //    if (!memoryCache.TryGetValue(GetAdminScoresKey, out adminScores))
+            //    {
+            //        adminScores = GetAdminScores(sqlConnectionStr);
+            //        var cacheOptions = new MemoryCacheEntryOptions().SetSlidingExpiration(TimeSpan.FromHours(24));
+            //        memoryCache.Set(GetAdminScoresKey, adminScores, cacheOptions);
+            //    }  
                 
-                var scoreTiltles = adminScores.Select(p => p.ScoreTitle.ToLower());
+            //    var scoreTiltles = adminScores.Select(p => p.ScoreTitle.ToLower());
                 
-                //Insert Customer
-                var customerMobileList = input.CustomerList.Select(p => p.CustomerMobileNo).Distinct();
+            //    //Insert Customer
+            //    var customerMobileList = input.CustomerList.Select(p => p.CustomerMobileNo).Distinct();
 
-                //Insert CustomerScore
-                var customerScores = new List<CustomerScoreDto>();
-                customerScores = input.CustomerList.Select(p => new CustomerScoreDto
-                {
-                    CustomerMobileNo = p.CustomerMobileNo,
-                    ScoreID = adminScores.FirstOrDefault(q => q.ScoreTitle.Equals(p.ScoreTitle,StringComparison.OrdinalIgnoreCase))?.ScoreID ?? 0,
-                    DateOccurred = p.DateOccurred, //
-                    Status = 1
-                }).ToList();
+            //    //Insert CustomerScore
+            //    var customerScores = new List<CustomerScoreDto>();
+            //    customerScores = input.CustomerList.Select(p => new CustomerScoreDto
+            //    {
+            //        CustomerMobileNo = p.CustomerMobileNo,
+            //        ScoreID = adminScores.FirstOrDefault(q => q.ScoreTitle.Equals(p.ScoreTitle,StringComparison.OrdinalIgnoreCase))?.ScoreID ?? 0,
+            //        DateOccurred = p.DateOccurred, //
+            //        Status = 1
+            //    }).ToList();
 
-                Parallel.Invoke(
-                    () => { BulkInsertCustomerModelToMySQL(sqlConnectionStr, customerMobileList); },
-                    () => { BulkInsertCustomerScoreToMySQL(sqlConnectionStr, customerScores); }
-                );
+            //    Parallel.Invoke(
+            //        () => { BulkInsertCustomerModelToMySQL(sqlConnectionStr, customerMobileList); },
+            //        () => { BulkInsertCustomerScoreToMySQL(sqlConnectionStr, customerScores); }
+            //    );
 
-                return Results.Ok();
-            });
+            //    return Results.Ok(input);
+            //});
         }
     }
 }

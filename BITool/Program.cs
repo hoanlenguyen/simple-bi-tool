@@ -9,7 +9,13 @@ using Microsoft.OpenApi.Models;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
-//builder.WebHost.UseKestrel(o => o.Limits.MaxRequestBodySize = 1048576000).UseIIS();
+// config request handle large file
+builder.WebHost.UseKestrel(options => {
+    options.Limits.KeepAliveTimeout = TimeSpan.FromMinutes(10);
+    options.Limits.MaxRequestBodySize = null;
+    options.Limits.MaxRequestBufferSize = null;
+    options.Limits.MaxResponseBufferSize = null;
+}).UseIIS(); 
 
 //add db context
 var sqlConnectionStr = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -96,7 +102,7 @@ builder.Services.AddMemoryCache();
 
 var app = builder.Build();
 
-//ExceptionHandler
+// response ExceptionHandler
 app.UseExceptionHandler(c => c.Run(async context =>
 {
     var exception = context.Features.Get<IExceptionHandlerFeature>()?.Error;
@@ -108,7 +114,7 @@ app.UseExceptionHandler(c => c.Run(async context =>
     }
 }));
 
-// Configure the HTTP request pipeline.
+// Configure UseSwaggerUI
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

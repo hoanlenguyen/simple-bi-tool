@@ -245,87 +245,95 @@ namespace BITool.Services
 
                 using (MySqlConnection mConnection = new MySqlConnection(sqlConnectionStr))
                 {
+                    mConnection.Open();                    
                     var sCommand = new StringBuilder("INSERT IGNORE INTO customer (DateFirstAdded, CustomerMobileNo, Status) VALUES ");
                     sCommand.Append(string.Join(",", customerRows)); //may use MySqlHelper.EscapeString
                     sCommand.Append(";");
-                    mConnection.Open();
                     using (MySqlCommand myCmd = new MySqlCommand(sCommand.ToString(), mConnection))
                     {
                         myCmd.CommandType = CommandType.Text;
                         myCmd.ExecuteNonQuery();
                     }
 
-                    var customerCount = customerRows.Count;
-                    var customerScoreCount = customerScoreRows.Count;
-                    var limited = 600000;
-                    if (customerCount <= limited)//out of memory
-                    {
-                        sCommand.Append(string.Join(",", customerRows)); //may use MySqlHelper.EscapeString
-                        sCommand.Append(";");
-                        mConnection.Open();
-                        using (MySqlCommand myCmd = new MySqlCommand(sCommand.ToString(), mConnection))
-                        {
-                            myCmd.CommandType = CommandType.Text;
-                            myCmd.ExecuteNonQuery();
-                        }
-                    }
-                    else
-                    {
-                        var addRows = customerRows.GetRange(0, limited);
-                        sCommand.Append(string.Join(",", addRows)); //may use MySqlHelper.EscapeString
-                        sCommand.Append(";");
-                        mConnection.Open();
-                        using (MySqlCommand myCmd = new MySqlCommand(sCommand.ToString(), mConnection))
-                        {
-                            myCmd.CommandType = CommandType.Text;
-                            myCmd.ExecuteNonQuery();
-                        }
-
-                        addRows = customerRows.GetRange(limited, customerCount - limited);
-                        sCommand = new StringBuilder("INSERT IGNORE INTO customer (DateFirstAdded, CustomerMobileNo, Status) VALUES ");
-                        sCommand.Append(string.Join(",", customerRows)); //may use MySqlHelper.EscapeString
-                        sCommand.Append(";");
-                        using (MySqlCommand myCmd = new MySqlCommand(sCommand.ToString(), mConnection))
-                        {
-                            myCmd.CommandType = CommandType.Text;
-                            myCmd.ExecuteNonQuery();
-                        }
-                    }
-
                     sCommand = new StringBuilder(
                        "INSERT IGNORE INTO customerscore (CustomerMobileNo, ScoreID, DateOccurred, Status) VALUES ");
-                    if (customerScoreCount <= limited)//out of memory
+                    sCommand.Append(string.Join(",", customerScoreRows));
+                    sCommand.Append(";");
+                    using (MySqlCommand myCmd = new MySqlCommand(sCommand.ToString(), mConnection))
                     {
-                        sCommand.Append(string.Join(",", customerScoreRows));
-                        sCommand.Append(";");
-                        using (MySqlCommand myCmd = new MySqlCommand(sCommand.ToString(), mConnection))
-                        {
-                            myCmd.CommandType = CommandType.Text;
-                            myCmd.ExecuteNonQuery();
-                        }
+                        myCmd.CommandType = CommandType.Text;
+                        myCmd.ExecuteNonQuery();
                     }
-                    else
-                    {
-                        var addRows = customerScoreRows.GetRange(0, limited);
-                        sCommand.Append(string.Join(",", addRows)); //may use MySqlHelper.EscapeString
-                        sCommand.Append(";");
-                        using (MySqlCommand myCmd = new MySqlCommand(sCommand.ToString(), mConnection))
-                        {
-                            myCmd.CommandType = CommandType.Text;
-                            myCmd.ExecuteNonQuery();
-                        }
 
-                        addRows = customerScoreRows.GetRange(limited, customerScoreCount - limited);
-                        sCommand = new StringBuilder(
-                        "INSERT IGNORE INTO customerscore (CustomerMobileNo, ScoreID, DateOccurred, Status) VALUES ");
-                        sCommand.Append(string.Join(",", addRows)); //may use MySqlHelper.EscapeString
-                        sCommand.Append(";");
-                        using (MySqlCommand myCmd = new MySqlCommand(sCommand.ToString(), mConnection))
-                        {
-                            myCmd.CommandType = CommandType.Text;
-                            myCmd.ExecuteNonQuery();
-                        }
-                    }
+                    //var customerCount = customerRows.Count;
+                    //var customerScoreCount = customerScoreRows.Count;
+                    //var limited = 600000;
+                    //if (customerCount <= limited)//out of memory
+                    //{
+                    //    sCommand.Append(string.Join(",", customerRows)); //may use MySqlHelper.EscapeString
+                    //    sCommand.Append(";");
+                    //    using (MySqlCommand myCmd = new MySqlCommand(sCommand.ToString(), mConnection))
+                    //    {
+                    //        myCmd.CommandType = CommandType.Text;
+                    //        myCmd.ExecuteNonQuery();
+                    //    }
+                    //}
+                    //else
+                    //{
+                    //    var addRows = customerRows.GetRange(0, limited);
+                    //    sCommand.Append(string.Join(",", addRows)); //may use MySqlHelper.EscapeString
+                    //    sCommand.Append(";");
+                    //    using (MySqlCommand myCmd = new MySqlCommand(sCommand.ToString(), mConnection))
+                    //    {
+                    //        myCmd.CommandType = CommandType.Text;
+                    //        myCmd.ExecuteNonQuery();
+                    //    }
+
+                    //    addRows = customerRows.GetRange(limited, customerCount - limited);
+                    //    sCommand = new StringBuilder("INSERT IGNORE INTO customer (DateFirstAdded, CustomerMobileNo, Status) VALUES ");
+                    //    sCommand.Append(string.Join(",", customerRows)); //may use MySqlHelper.EscapeString
+                    //    sCommand.Append(";");
+                    //    using (MySqlCommand myCmd = new MySqlCommand(sCommand.ToString(), mConnection))
+                    //    {
+                    //        myCmd.CommandType = CommandType.Text;
+                    //        myCmd.ExecuteNonQuery();
+                    //    }
+                    //}
+
+                    //sCommand = new StringBuilder(
+                    //   "INSERT IGNORE INTO customerscore (CustomerMobileNo, ScoreID, DateOccurred, Status) VALUES ");
+                    //if (customerScoreCount <= limited)//out of memory
+                    //{
+                    //    sCommand.Append(string.Join(",", customerScoreRows));
+                    //    sCommand.Append(";");
+                    //    using (MySqlCommand myCmd = new MySqlCommand(sCommand.ToString(), mConnection))
+                    //    {
+                    //        myCmd.CommandType = CommandType.Text;
+                    //        myCmd.ExecuteNonQuery();
+                    //    }
+                    //}
+                    //else
+                    //{
+                    //    var addRows = customerScoreRows.GetRange(0, limited);
+                    //    sCommand.Append(string.Join(",", addRows)); //may use MySqlHelper.EscapeString
+                    //    sCommand.Append(";");
+                    //    using (MySqlCommand myCmd = new MySqlCommand(sCommand.ToString(), mConnection))
+                    //    {
+                    //        myCmd.CommandType = CommandType.Text;
+                    //        myCmd.ExecuteNonQuery();
+                    //    }
+
+                    //    addRows = customerScoreRows.GetRange(limited, customerScoreCount - limited);
+                    //    sCommand = new StringBuilder(
+                    //    "INSERT IGNORE INTO customerscore (CustomerMobileNo, ScoreID, DateOccurred, Status) VALUES ");
+                    //    sCommand.Append(string.Join(",", addRows)); //may use MySqlHelper.EscapeString
+                    //    sCommand.Append(";");
+                    //    using (MySqlCommand myCmd = new MySqlCommand(sCommand.ToString(), mConnection))
+                    //    {
+                    //        myCmd.CommandType = CommandType.Text;
+                    //        myCmd.ExecuteNonQuery();
+                    //    }
+                    //}
                 }
 
                 return Results.Ok(errorList);

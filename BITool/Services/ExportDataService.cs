@@ -90,7 +90,7 @@ namespace BITool.Services
                 }
             });
 
-            app.MapGet("data/getCustomersBySP", [Authorize]
+            app.MapGet("data/getCustomersBySP", [AllowAnonymous]
             async Task<IResult>
                 (
                 int? scoreId,
@@ -120,7 +120,7 @@ namespace BITool.Services
                     var customerData = new List<string>();
                     while (rdr.Read())
                     {
-                        customerData.Add((string)rdr["CustomerMobileNo"]);
+                        customerData.Add(rdr.GetString(0));
                     }
                     rdr.Close();
                     conn.Close();

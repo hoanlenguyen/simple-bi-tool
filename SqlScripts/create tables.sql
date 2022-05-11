@@ -46,7 +46,8 @@ create table CustomerScore(
    DateOccurred DATETIME NOT NULL,
    Status INT NOT null,
    LastUpdatedBy INT,
-   LastUpdatedON DATETIME, 
+   LastUpdatedON DATETIME,
+   INDEX(CustomerMobileNo),
    PRIMARY KEY ( CustomerScoreID )
 );
 

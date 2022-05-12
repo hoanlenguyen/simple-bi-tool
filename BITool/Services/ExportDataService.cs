@@ -90,7 +90,7 @@ namespace BITool.Services
                 }
             });
 
-            app.MapGet("data/getCustomersBySP", [AllowAnonymous]
+            app.MapGet("data/getCustomersBySP", [Authorize]
             async Task<IResult>
                 (
                 string? scoreIds,

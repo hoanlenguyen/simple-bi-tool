@@ -70,7 +70,7 @@ namespace BITool.Services
                     return Results.Unauthorized();
                 }
             });
-            app.MapPost("auth/checkConfig", [Authorize] async (IConfiguration config, IHttpContextAccessor httpContextAccessor) =>
+            app.MapGet("auth/checkConfig", [Authorize] async (IConfiguration config, IHttpContextAccessor httpContextAccessor) =>
             {
                 return Results.Ok(new
                 {
@@ -78,6 +78,12 @@ namespace BITool.Services
                     userId= httpContextAccessor.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier),
                     email= httpContextAccessor.HttpContext.User.FindFirstValue(ClaimTypes.Email)
                 });
+            });
+
+            app.MapGet("test/runTestService", [AllowAnonymous] async (ITestService testService) =>
+            {
+                testService.AddTestServiceToQueue("call test/MonitorLoop");
+                return Results.Ok();
             });
         }
     }

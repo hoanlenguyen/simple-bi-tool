@@ -1,3 +1,4 @@
+using BITool.BackgroundJobs;
 using BITool.DBContext;
 using BITool.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -99,6 +100,16 @@ builder.Services.AddSwaggerGen(options =>
     options.AddSecurityRequirement(securityReq);
 });
 builder.Services.AddMemoryCache();
+
+//add Queue job in background
+builder.Services.AddSingleton<ITestService, TestService>();
+builder.Services.AddHostedService<QueuedHostedService>();
+builder.Services.AddSingleton<IBackgroundTaskQueue>(ctx =>
+{
+    if (!int.TryParse(builder.Configuration["QueueCapacity"], out var queueCapacity))
+        queueCapacity = 100;
+    return new BackgroundTaskQueue(queueCapacity);
+});
 
 var app = builder.Build();
 

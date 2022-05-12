@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Text;
 
 namespace BITool.Services
@@ -45,14 +46,21 @@ namespace BITool.Services
                     var audience = config["Jwt:Audience"];
                     var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(config["Jwt:Key"]));
                     var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
-                    var token = new JwtSecurityToken(issuer: issuer,
+                    var claims= new List<Claim>
+                    {
+                        new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                        new Claim(ClaimTypes.Email, user.Email)
+                    };
+                    var token = new JwtSecurityToken(
+                        issuer: issuer,
                         audience: audience,
-                        signingCredentials: credentials);
+                        signingCredentials: credentials,
+                        claims: claims);
                     var tokenHandler = new JwtSecurityTokenHandler();
                     var accessToken = tokenHandler.WriteToken(token);
                     return Results.Ok(new
                     {
-                        accessToken= accessToken,
+                        accessToken = accessToken,
                         email = user.Email,
                         name = user.FirstName
                     });
@@ -61,6 +69,15 @@ namespace BITool.Services
                 {
                     return Results.Unauthorized();
                 }
+            });
+            app.MapPost("auth/checkConfig", [Authorize] async (IConfiguration config, IHttpContextAccessor httpContextAccessor) =>
+            {
+                return Results.Ok(new
+                {
+                    conn = config["ConnectionStrings:DefaultConnection"],
+                    userId= httpContextAccessor.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier),
+                    email= httpContextAccessor.HttpContext.User.FindFirstValue(ClaimTypes.Email)
+                });
             });
         }
     }

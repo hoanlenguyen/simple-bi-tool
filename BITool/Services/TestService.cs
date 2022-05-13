@@ -12,7 +12,7 @@ namespace BITool.Services
         private readonly IBackgroundTaskQueue taskQueue;
         private readonly ILogger logger;
         private readonly CancellationToken cancellationToken;
-
+        private readonly ITestService testService;
         public TestService(
             IBackgroundTaskQueue taskQueue,
             ILogger<TestService> logger,
@@ -25,7 +25,7 @@ namespace BITool.Services
 
         public void AddTestServiceToQueue(string input)
         {
-            logger.LogInformation("TestService is starting. AddToQueueTestService");
+            logger.LogInformation($"{nameof(TestService)} is starting. {nameof(AddTestServiceToQueue)} {nameof(ImplementTestWorkItem)}");
             Task.Run(async () => await taskQueue.QueueBackgroundWorkItemAsync(ct => ImplementTestWorkItem(cancellationToken, input)));
         }         
 

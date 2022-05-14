@@ -90,11 +90,10 @@ namespace BITool.Services
                 }
             });
 
-            app.MapGet("data/getCustomersBySP", [AllowAnonymous]
+            app.MapGet("data/getCustomersBySP", [Authorize]
             async Task<IResult>
                 (
-                int? scoreId,
-                string? scoreCategory,
+                string? scoreIds,
                 string? keyWord,
                 DateTime? dateFirstAddedFrom,
                 DateTime? dateFirstAddedTo
@@ -111,8 +110,7 @@ namespace BITool.Services
                     conn.Open();
                     var cmd = new MySqlCommand("SearchCustomer", conn);
                     cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@scoreId", scoreId);
-                    cmd.Parameters.AddWithValue("@scoreCategory", scoreCategory);
+                    cmd.Parameters.AddWithValue("@scoreIds", scoreIds);
                     cmd.Parameters.AddWithValue("@keyWord", keyWord);
                     cmd.Parameters.AddWithValue("@dateFirstAddedFrom", dateFirstAddedFrom);
                     cmd.Parameters.AddWithValue("@dateFirstAddedTo", dateFirstAddedTo);

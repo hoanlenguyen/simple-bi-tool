@@ -1,0 +1,11 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/BIToolApi/obj
+/BIToolApi/bin/Debug/net6.0
+/BIToolApi/.vs/BITool/v17
+/BIToolApi/.vs/BITool
+/BIToolApi/bin/Release/net6.0
+/BIToolApi/Properties/PublishProfiles
+/BIToolApi/Properties/ServiceDependencies
